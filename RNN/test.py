@@ -1,8 +1,13 @@
-# Import Packages
+# Import packages
 import pandas as pd
+import numpy as np
+import random
 import spacy
 import time
 import re
+
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 '''
@@ -13,7 +18,6 @@ Text Preprocessing using spaCy
 4. POS tagging
 5. Punctuations and Noise removal
 '''
-
 
 class Spacy(object):
 
@@ -29,9 +33,9 @@ class Spacy(object):
         text = re.sub(r'http[\w:/\.]+', '', text) # removing urls
         text = re.sub(r'[^\.\w\s]', '', text) # removing everything but characters and punctuation
         text = re.sub(r'\.', '.', text) # replace periods with a single one
-        text = re.sub(r'\s\s+', ' ', text) # replace multiple whitespace with one
         text = re.sub(r'\n', ' ', text) # removing line break
         text = re.sub(r'[^\w\s]', '', text.lower())
+        text = re.sub(r'\s\s+', ' ', text)  # replace multiple whitespace with one
         return text
 
     def stopWords(self, text):
@@ -46,8 +50,12 @@ class Spacy(object):
     def lemmatize(self, tokens):
         lemma_token = ""
         tokens_object = self.nlp(tokens)
+        # lemma_token = [token.lemma_ for token in tokens_object]
+        # lemma_token = ''.join(lemma_token) # converts list to string
         for token in tokens_object:
             lemma_token = lemma_token + " " + token.lemma_
+        lemma_token = re.sub(r'\s\s+', ' ', lemma_token)  # replace multiple whitespace with one
+        lemma_token = lemma_token.strip() # removes trailing whitespaces
         return  lemma_token
 
     def set_custom_boundaries(self, doc):
@@ -67,17 +75,57 @@ class Spacy(object):
         doc = self.nlp(text)
         print([token.text for token in doc])
 
-class CleanCorpus(object):
+    def orchestrate(self, text):
+        return self.lemmatize(self.stopWords(self.deNoise(text)))
 
-    def main(self, document):
-        S = Spacy()
-        text = x[90]
-        text = S.deNoise(text)
-        tokens = S.stopWords(text)
-        lemma_tokens = S.lemmatize(tokens)
-        return lemma_tokens
-        # S.sentence_detect(lemma_tokens)
-        # S.tokenize(x[0])
+
+class Embedding(object):
+
+    def __init__(self):
+        # Parameters
+        self.MAX_VOCAB_SIZE = 1000000  # maximum no of unique words
+        self.MAX_DOC_LENGTH = 500  # maximum no of words in each sentence
+        self.EMBEDDING_DIM = 300  # Embeddings dimension from Glove directory
+        self.GLOVE_DIR = 'models/glove.6B/glove.6B.' + str(self.EMBEDDING_DIM) + 'd.txt'
+
+    def tokenize_padding(self, docs):
+        # Tokenize & pad sequences
+        tokenizer = Tokenizer(num_words=self.MAX_VOCAB_SIZE, oov_token='-EOS-')
+        tokenizer.fit_on_texts(docs)
+        encoded_docs = tokenizer.texts_to_sequences(docs)
+        word_index = tokenizer.word_index
+        print('Vocabulary size :', len(word_index))
+        sequences = pad_sequences(encoded_docs, padding='post', maxlen=self.MAX_DOC_LENGTH)
+        return [word_index, sequences]
+
+    def load_glove(self):
+        embeddings_index = {}
+        f = open(self.GLOVE_DIR, encoding='utf-8')
+        print('Loading Glove from: ', self.GLOVE_DIR, '...', end='')
+        for line in f:
+            values = line.split()
+            word = values[0]
+            embeddings_index[word] = np.asarray(values[1:], dtype='float32')
+        f.close()
+        print('Found %s word vectors.' % len(embeddings_index))
+        print('\nDone.\nProcedding with Embedded Matrix...', end='')
+        return embeddings_index
+
+    def embedding_matrix(self, word_index, embeddings_index):
+        # Create an embedding matrix
+        # first create a matrix of zeros, this is our embedding matrix
+        embeddings_matrix = np.zeros((len(word_index) + 1, self.EMBEDDING_DIM))
+        # embeddings_matrix = np.random.random(((20568),EMBEDDING_DIM))
+        for word, i in word_index.items():
+            embedding_vector = embeddings_index.get(word)
+            if embedding_vector is not None:
+                embeddings_matrix[i] = embedding_vector
+            else:
+                # doesn't exist, assign a random vector
+                embeddings_matrix[i] = np.random.random(self.EMBEDDING_DIM)
+        print('\nCompleted')
+        return embeddings_matrix
+
 
 if __name__ == "__main__":
 
@@ -92,11 +140,34 @@ if __name__ == "__main__":
     x = df.Subject + " " + df.Content
     y = pd.Series([0 if row == 'Fake' else 1 for row in df.Label])  # Series is 1D array but with same dtype
 
-    CC = CleanCorpus()
-
+    S = Spacy()
     start = time.time()
-    docs = [CC.main(row) for row in x]
+    docs = [S.orchestrate(row) for row in x]
     end = time.time()
     print("Cleaning the document took {} seconds".format(round(end - start)))
 
+    E = Embedding()
+    sequences = E.tokenize_padding(docs)
+    word_index = sequences[0]
+    sequences = sequences[1]
+    print('Shape of data tensor:', sequences.shape)
+    print('Shape of label tensor', y.shape)
 
+    # Shuffle data random before splitting
+    indices = np.arange(sequences.shape[0])
+    random.Random(1).shuffle(indices)
+    data = sequences[indices]
+    labels = y[indices]
+
+    start = time.time()
+    embeddings_index = E.load_glove()
+    embeddings_matrix = E.embedding_matrix(word_index, embeddings_index)
+    end = time.time()
+    print("Loading Glove and creating Embedding matrix took {} seconds".format(round(end - start)))
+
+
+'''
+To Dos
+1. In Spacy an extra s occurs with -PRON- eg: she's
+2. Set a dynamic range for MAX_DOC_LENGTH to best optimize. eg : Median length of all docs
+'''
