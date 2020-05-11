@@ -62,11 +62,11 @@ print('Shape of data tensor:', sequences.shape)
 print('Shape of label tensor', y.shape)
 
 # Shuffle data random before splitting
+import random
 indices = np.arange(sequences.shape[0])
-np.random.shuffle(indices)
+random.Random(1).shuffle(indices)
 data = sequences[indices]
 labels = y[indices]
-
 
 # Word Embeddings : the dimension are chosen in a experimental way have abstract meanings. They have nothing to do with corpus size.
 # larger dimension will capture more information but harder to use.
