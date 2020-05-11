@@ -19,7 +19,7 @@ df.isna().sum()
 df['Subject'].fillna('',inplace=True) # Replace all missing values
 x = df['Subject'] + " " + df['Content']
 #y = pd.get_dummies(df['Label'])
-y = [1 if row == 'Fake' else 0 for row in df['Label']]
+y = [0 if row == 'Fake' else 1 for row in df['Label']]
 y = np.array(y) # Dummy Encoding
 
 
@@ -74,18 +74,18 @@ labels = y[indices]
 
 # Word Embeddings : the dimension are chosen in a experimental way have abstract meanings. They have nothing to do with corpus size.
 # larger dimension will capture more information but harder to use.
-
-embeddings_index = {}
-f = open(GLOVE_DIR, encoding='utf-8')
-print('Loading Glove from: ', GLOVE_DIR, '...', end='')
-for line in f:
-    values = line.split()
-    word = values[0]
-    embeddings_index[word] = np.asarray(values[1:], dtype='float32')
-f.close()
-print('Found %s word vectors.' % len(embeddings_index))
-print('\nDone.\nProcedding with Embedded Matrix...', end='')
-
+#
+# embeddings_index = {}
+# f = open(GLOVE_DIR, encoding='utf-8')
+# print('Loading Glove from: ', GLOVE_DIR, '...', end='')
+# for line in f:
+#     values = line.split()
+#     word = values[0]
+#     embeddings_index[word] = np.asarray(values[1:], dtype='float32')
+# f.close()
+# print('Found %s word vectors.' % len(embeddings_index))
+# print('\nDone.\nProcedding with Embedded Matrix...', end='')
+#
 #Create an embedding matrix
 # first create a matrix of zeros, this is our embedding matrix
 embeddings_matrix = np.zeros((len(word_index)+1, EMBEDDING_DIM))
@@ -108,57 +108,60 @@ y_test = labels[-num_test_samples:]
 
 # Develop DNN
 model = Sequential()
-#model.add(Embedding(len(word_index)+1, EMBEDDING_DIM, input_length=MAX_DOC_LENGTH))
-model.add(Embedding(input_dim=len(word_index)+1, output_dim=EMBEDDING_DIM,
-                    embeddings_initializer = Constant(embeddings_matrix),
-                    input_length = MAX_DOC_LENGTH,
-                    trainable=True,
-                    mask_zero=True))
-model.add(LSTM(units=1))
+model.add(Embedding(input_dim=len(word_index) + 1,
+                    output_dim=EMBEDDING_DIM,
+                    input_length=MAX_DOC_LENGTH,
+                    trainable=False))
+# model.add(Embedding(input_dim=len(word_index)+1, output_dim=EMBEDDING_DIM,
+#                     embeddings_initializer = Constant(embeddings_matrix),
+#                     input_length = MAX_DOC_LENGTH,
+#                     trainable=True,
+#                     mask_zero=True))
+model.add(LSTM(units=256))
 model.add(Dense(1, activation='sigmoid'))
 model.summary()
 
 # Train the model
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # only compilation
-history = model.fit(x_train, y_train, epochs=5, batch_size=10, validation_split=0.2)
+history = model.fit(x_train, y_train, epochs=3, batch_size=40, validation_split=0.2)
 #evaluating model
 score, acc = model.evaluate(x_test, y_test, batch_size=10)
 print('Test score:', score)
 print('Test accuracy:', acc)
 
-
-# Model Evaluation
-import matplotlib.pyplot as plt
-loss = history.history[‘loss’]
-val_loss = history.history[‘val_loss’]
-epochs = range(1, len(loss)+1)
-plt.plot(epochs, loss, label=’Training loss’)
-plt.plot(epochs, val_loss, label=’Validation loss’)
-plt.title(‘Training and validation loss’)
-plt.xlabel(‘Epochs’)
-plt.ylabel(‘Loss’)
-plt.legend()
-plt.show()
-
-accuracy = history.history[‘acc’]
-val_accuracy = history.history[‘val_acc’]
-plt.plot(epochs, accuracy, label=’Training accuracy’)
-plt.plot(epochs, val_accuracy, label=’Validation accuracy’)
-plt.title(‘Training and validation accuracy’)
-plt.ylabel(‘Accuracy’)
-plt.xlabel(‘Epochs’)
-plt.legend()
-plt.show()
-
-random_num = np.random.randint(0, 100)
-test_data = x[random_num]
-test_label = y[random_num]
-clean_test_data = clean_text(test_data)
-test_tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
-test_tokenizer.fit_on_texts(clean_test_data)
-test_sequences = tokenizer.texts_to_sequences(clean_test_data)
-word_index = test_tokenizer.word_index
-test_data_padded = pad_sequences(test_sequences, padding = ‘post’, maxlen = MAX_SEQUENCE_LENGTH)
-
-prediction = model.predict(test_data_padded)
-prediction[random_num].argsort()[-len(prediction[random_num]):]
+#
+# # Model Evaluation
+# import matplotlib.pyplot as plt
+# loss = history.history[‘loss’]
+# val_loss = history.history[‘val_loss’]
+# epochs = range(1, len(loss)+1)
+# plt.plot(epochs, loss, label=’Training loss’)
+# plt.plot(epochs, val_loss, label=’Validation loss’)
+# plt.title(‘Training and validation loss’)
+# plt.xlabel(‘Epochs’)
+# plt.ylabel(‘Loss’)
+# plt.legend()
+# plt.show()
+#
+# accuracy = history.history[‘acc’]
+# val_accuracy = history.history[‘val_acc’]
+# plt.plot(epochs, accuracy, label=’Training accuracy’)
+# plt.plot(epochs, val_accuracy, label=’Validation accuracy’)
+# plt.title(‘Training and validation accuracy’)
+# plt.ylabel(‘Accuracy’)
+# plt.xlabel(‘Epochs’)
+# plt.legend()
+# plt.show()
+#
+# random_num = np.random.randint(0, 100)
+# test_data = x[random_num]
+# test_label = y[random_num]
+# clean_test_data = clean_text(test_data)
+# test_tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
+# test_tokenizer.fit_on_texts(clean_test_data)
+# test_sequences = tokenizer.texts_to_sequences(clean_test_data)
+# word_index = test_tokenizer.word_index
+# test_data_padded = pad_sequences(test_sequences, padding = ‘post’, maxlen = MAX_SEQUENCE_LENGTH)
+#
+# prediction = model.predict(test_data_padded)
+# prediction[random_num].argsort()[-len(prediction[random_num]):]
