@@ -11,7 +11,7 @@ Use the following link: https://drive.google.com/file/d/0B7XkCwpI5KDYNlNUTTlSS21
 '''
 
 # load the google word2vec model
-filename = 'models/GoogleNews-vectors-negative300.bin'
+filename = '/Users/lokesharma/PycharmProjects/MachineLearning/GBVAT/embeddings/GoogleNews-vectors-negative300.bin'
 model = KeyedVectors.load_word2vec_format(filename, binary=True)
 
 # calculate: (king - man) + woman = ?
