@@ -36,6 +36,11 @@ labels_index = {}  # dictionary mapping label name to numeric id
 labels = []        # list of label ids
 label_text = []    # list of label texts
 # Go through each directory
+
+for name in sorted(os.listdir(TEXT_DATA_DIR)):
+    print(name)
+
+
 for name in sorted(os.listdir(TEXT_DATA_DIR)):
     path = os.path.join(TEXT_DATA_DIR, name)
     if os.path.isdir(path):
